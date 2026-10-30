@@ -1,0 +1,32 @@
+name: browser-gamebox
+
+services:
+  gamebox:
+    image: ${GAMEBOX_IMAGE}
+    platform: linux/amd64
+    restart: unless-stopped
+    shm_size: 1gb
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      CUSTOM_USER: ${GAMEBOX_USER}
+      PASSWORD: ${GAMEBOX_PASSWORD}
+    ports:
+      - "127.0.0.1:${GAMEBOX_PORT}:3001"
+    volumes:
+      - type: bind
+        source: ${GAMEBOX_DATA_PATH}/config
+        target: /config
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${GAMEBOX_DATA_PATH}/games
+        target: /games
+        bind:
+          create_host_path: false
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'

@@ -1,0 +1,93 @@
+- name: "🐳 Prepare Docker and game directories"
+  hosts: localhost
+  gather_facts: true
+  tasks:
+    - name: "🔎 Require Ubuntu or Debian"
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution in ['Ubuntu', 'Debian']
+        fail_msg: This playbook supports Ubuntu and Debian servers.
+
+    - name: "🔎 Validate architecture, data path and ownership"
+      ansible.builtin.assert:
+        that:
+          - ansible_architecture == 'x86_64'
+          - gamebox_env.GAMEBOX_DATA_PATH is match('^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$')
+          - gamebox_env.GAMEBOX_DATA_PATH != deploy_path
+          - not gamebox_env.GAMEBOX_DATA_PATH.startswith(deploy_path + '/')
+          - gamebox_env.PUID is match('^[1-9][0-9]*$')
+          - gamebox_env.PGID is match('^[1-9][0-9]*$')
+
+    - name: "🔎 Check Docker"
+      ansible.builtin.command: docker --version
+      register: docker_check
+      changed_when: false
+      failed_when: false
+
+    - name: "🔎 Check Docker Compose"
+      ansible.builtin.command: docker compose version
+      register: compose_check
+      changed_when: false
+      failed_when: false
+
+    - name: "🐳 Install Docker and Compose if missing"
+      when: docker_check.rc != 0 or compose_check.rc != 0
+      block:
+        - name: Install repository prerequisites
+          ansible.builtin.apt:
+            name: ca-certificates
+            state: present
+            update_cache: true
+
+        - name: Create Docker keyring directory
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+
+        - name: Download official Docker repository key
+          ansible.builtin.get_url:
+            url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+            dest: /etc/apt/keyrings/docker.asc
+            mode: '0644'
+
+        - name: Detect package architecture
+          ansible.builtin.command: dpkg --print-architecture
+          register: package_architecture
+          changed_when: false
+
+        - name: Configure official Docker repository
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/gamebox-docker.list
+            mode: '0644'
+            content: >
+              deb [arch={{ package_architecture.stdout }} signed-by=/etc/apt/keyrings/docker.asc]
+              https://download.docker.com/linux/{{ ansible_distribution | lower }}
+              {{ ansible_distribution_release }} stable
+
+        - name: Install Docker Engine and Compose plugin
+          ansible.builtin.apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-compose-plugin
+            state: present
+            update_cache: true
+
+    - name: "▶️ Enable Docker service"
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: "📁 Create persistent game directories"
+      ansible.builtin.file:
+        path: "{{ gamebox_env.GAMEBOX_DATA_PATH }}/{{ item }}"
+        state: directory
+        owner: "{{ gamebox_env.PUID }}"
+        group: "{{ gamebox_env.PGID }}"
+        mode: '0750'
+      loop:
+        - config
+        - games

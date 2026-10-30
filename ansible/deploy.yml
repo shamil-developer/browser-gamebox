@@ -1,0 +1,92 @@
+- name: "🚀 Deploy or manage gamebox"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    compose_command:
+      - docker
+      - compose
+      - --env-file
+      - /dev/null
+      - -f
+      - "{{ deploy_path }}/compose.yml"
+  tasks:
+    - name: "🔎 Validate deployment settings"
+      ansible.builtin.assert:
+        that:
+          - gamebox_env.GAMEBOX_DATA_PATH is match('^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$')
+          - gamebox_env.GAMEBOX_DATA_PATH != deploy_path
+          - not gamebox_env.GAMEBOX_DATA_PATH.startswith(deploy_path + '/')
+          - gamebox_env.GAMEBOX_PORT is match('^[0-9]+$')
+          - gamebox_env.GAMEBOX_PORT | int > 0
+          - gamebox_env.GAMEBOX_PORT | int < 65536
+          - gamebox_env.PUID is match('^[1-9][0-9]*$')
+          - gamebox_env.PGID is match('^[1-9][0-9]*$')
+          - gamebox_env.GAMEBOX_IMAGE | length > 0
+          - gamebox_env.GAMEBOX_USER | length > 0
+          - gamebox_env.GAMEBOX_PASSWORD | length >= 16
+          - gamebox_env.TZ | length > 0
+          - container_action in ['deploy', 'start', 'stop', 'restart']
+      no_log: true
+
+    - name: "🔐 Pass Compose settings through the process environment"
+      environment: "{{ gamebox_env }}"
+      no_log: true
+      block:
+        - name: "🔎 Validate production Compose"
+          ansible.builtin.command:
+            argv: "{{ compose_command + ['config', '--quiet'] }}"
+          changed_when: false
+
+        - name: "🔎 Find existing containers"
+          ansible.builtin.command:
+            argv: "{{ compose_command + ['ps', '--all', '--quiet'] }}"
+          register: containers
+          changed_when: false
+          when: container_action != 'deploy'
+
+        - name: "🔎 Require an existing deployment"
+          ansible.builtin.assert:
+            that:
+              - containers.stdout_lines | length == 1
+            fail_msg: Deploy gamebox before managing containers.
+          when: container_action != 'deploy'
+
+        - name: "📦 Download specified image versions"
+          ansible.builtin.command:
+            argv: "{{ compose_command + ['pull'] }}"
+          when: container_action == 'deploy'
+          changed_when: true
+
+        - name: "🚀 Start or update containers without deleting volumes"
+          ansible.builtin.command:
+            argv: "{{ compose_command + ['up', '-d', '--wait', '--wait-timeout', '180'] }}"
+          when: container_action == 'deploy'
+          changed_when: true
+
+        - name: "⏹️ Stop containers and retain all data"
+          ansible.builtin.command:
+            argv: "{{ compose_command + ['stop'] }}"
+          when: container_action in ['stop', 'restart']
+          changed_when: true
+
+        - name: "▶️ Start existing containers"
+          ansible.builtin.command:
+            argv: "{{ compose_command + ['start', '--wait', '--wait-timeout', '180'] }}"
+          when: container_action in ['start', 'restart']
+          changed_when: true
+
+    - name: "💚 Wait for authenticated browser access"
+      ansible.builtin.uri:
+        url: "https://127.0.0.1:{{ gamebox_env.GAMEBOX_PORT }}/"
+        url_username: "{{ gamebox_env.GAMEBOX_USER }}"
+        url_password: "{{ gamebox_env.GAMEBOX_PASSWORD }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+        return_content: false
+      register: health
+      until: health.status | default(0) == 200
+      retries: 60
+      delay: 2
+      when: container_action != 'stop'
+      no_log: true

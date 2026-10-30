@@ -1,0 +1,91 @@
+name: ⏯️ 4. Manage containers
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Container action (keeps games and saves)
+        required: true
+        type: choice
+        default: start
+        options:
+        - start
+        - stop
+        - restart
+permissions:
+  contents: read
+concurrency:
+  group: gamebox-production
+  cancel-in-progress: false
+jobs:
+  manage:
+    name: ⏯️ 4. Manage containers
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    steps:
+    - name: 📥 Checkout configuration
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+    - name: 🔐 SSH · 📦 Transfer · ▶️ Ansible
+      shell: bash
+      env:
+        PLAYBOOK_OPERATION: deploy
+        CONTAINER_ACTION: ${{ inputs.action }}
+        SSH_HOST: ${{ vars.SSH_HOST }}
+        SSH_PORT: ${{ vars.SSH_PORT }}
+        SSH_USER: ${{ vars.SSH_USER }}
+        DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        SSH_KNOWN_HOSTS: ${{ vars.SSH_KNOWN_HOSTS }}
+        GAMEBOX_DATA_PATH: ${{ vars.GAMEBOX_DATA_PATH }}
+        GAMEBOX_PORT: ${{ vars.GAMEBOX_PORT }}
+        GAMEBOX_IMAGE: ${{ vars.GAMEBOX_IMAGE }}
+        GAMEBOX_USER: ${{ vars.GAMEBOX_USER }}
+        PUID: ${{ vars.PUID }}
+        PGID: ${{ vars.PGID }}
+        TZ: ${{ vars.TZ }}
+        GAMEBOX_PASSWORD: ${{ secrets.GAMEBOX_PASSWORD }}
+      run: |
+        set -euo pipefail
+        echo '::group::🔎 Validate inputs and settings'
+        case "$CONTAINER_ACTION" in start|stop|restart) ;; *) echo 'Invalid container action' >&2; exit 1;; esac
+        for field in SSH_HOST SSH_PORT SSH_USER DEPLOY_PATH SSH_PRIVATE_KEY SSH_KNOWN_HOSTS; do
+          test -n "${!field}" || { echo "Missing $field" >&2; exit 1; }
+        done
+        # DEPLOY_PATH is used in remote shell commands; allow only a plain absolute path.
+        [[ "$DEPLOY_PATH" =~ ^/[a-zA-Z0-9_-]+(/[a-zA-Z0-9_-]+)*$ ]] || { echo 'Invalid DEPLOY_PATH' >&2; exit 1; }
+        echo '::endgroup::'
+        echo '::group::🔐 Configure SSH'
+        umask 077
+        printf '%s\n' "$SSH_PRIVATE_KEY" > "$RUNNER_TEMP/gamebox-key"
+        printf '%s\n' "$SSH_KNOWN_HOSTS" > "$RUNNER_TEMP/gamebox-known-hosts"
+        trap 'rm -f "$RUNNER_TEMP/gamebox-key" "$RUNNER_TEMP/gamebox-known-hosts"' EXIT
+        ssh_command=(ssh -i "$RUNNER_TEMP/gamebox-key" -p "$SSH_PORT"
+          -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes
+          -o UserKnownHostsFile="$RUNNER_TEMP/gamebox-known-hosts" "$SSH_USER@$SSH_HOST")
+        echo '::endgroup::'
+        echo '::group::📦 Transfer configuration'
+        tar -cf - compose.yml "ansible/$PLAYBOOK_OPERATION.yml" | "${ssh_command[@]}" \
+          "set -e; root=''; [ \"\$(id -u)\" = 0 ] || root='sudo -n';
+           \$root install -d -m 755 '$DEPLOY_PATH';
+           \$root tar --no-same-owner --no-same-permissions -xf - -C '$DEPLOY_PATH'"
+        echo '::endgroup::'
+        echo '::group::▶️ Run Ansible on the server'
+        # Settings travel through SSH stdin; no server-side environment file.
+        python3 - <<'PY' | "${ssh_command[@]}" \
+          "set -e; root=''; [ \"\$(id -u)\" = 0 ] || root='sudo -n';
+           command -v ansible-playbook >/dev/null || { echo 'Run Install Ansible first.' >&2; exit 1; };
+           \$root ansible-playbook -i localhost, -c local '$DEPLOY_PATH/ansible/$PLAYBOOK_OPERATION.yml' --extra-vars @/dev/stdin"
+        import json
+        import os
+        fields = ('GAMEBOX_DATA_PATH', 'GAMEBOX_PORT', 'GAMEBOX_IMAGE', 'GAMEBOX_USER', 'PUID', 'PGID', 'TZ', 'GAMEBOX_PASSWORD')
+        for key in fields:
+            if not os.environ.get(key):
+                raise SystemExit('Missing ' + key)
+        print(json.dumps({'deploy_path': os.environ['DEPLOY_PATH'],
+                          'container_action': os.environ.get('CONTAINER_ACTION', ''),
+                          'gamebox_env': {key: os.environ[key] for key in fields}}))
+        PY
+        echo '::endgroup::'
+        printf '### ✅ %s %s completed\n' "$PLAYBOOK_OPERATION" "$CONTAINER_ACTION" >> "$GITHUB_STEP_SUMMARY"
