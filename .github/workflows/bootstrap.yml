@@ -38,7 +38,7 @@ jobs:
           echo '::endgroup::'
           echo '::group::🔧 Check and install Ansible on the server'
           ssh -i "$RUNNER_TEMP/gamebox-key" -p "$SSH_PORT" \
-            -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes \
+            -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 -o ServerAliveCountMax=6 -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$RUNNER_TEMP/gamebox-known-hosts" \
             "$SSH_USER@$SSH_HOST" \
             'if [ "$(id -u)" = 0 ]; then exec sh -s; else exec sudo -n sh -s; fi' <<'REMOTE'
