@@ -30,6 +30,13 @@
           - gamebox_env.STREAM_HEIGHT | int <= 16384
           - gamebox_env.STREAM_FPS | int >= 8
           - gamebox_env.STREAM_FPS | int <= 240
+          - gamebox_env.STREAM_CRF is match('^[0-9]+$')
+          - gamebox_env.STREAM_CRF | int >= 5
+          - gamebox_env.STREAM_CRF | int <= 50
+          - gamebox_env.STREAM_AUDIO_BITRATE is match('^[0-9]+$')
+          - gamebox_env.STREAM_AUDIO_BITRATE | int >= 6000
+          - gamebox_env.STREAM_AUDIO_BITRATE | int <= 510000
+          - gamebox_env.STREAM_AUDIO_CHANNELS in ['1', '2', '6', '8']
           - gamebox_env.GAMEBOX_IMAGE | length > 0
           - gamebox_env.GAMEBOX_USER | length > 0
           - gamebox_env.GAMEBOX_PASSWORD | length >= 16

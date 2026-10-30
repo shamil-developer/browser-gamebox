@@ -33,6 +33,9 @@ jobs:
         STREAM_WIDTH: ${{ vars.STREAM_WIDTH }}
         STREAM_HEIGHT: ${{ vars.STREAM_HEIGHT }}
         STREAM_FPS: ${{ vars.STREAM_FPS }}
+        STREAM_CRF: ${{ vars.STREAM_CRF }}
+        STREAM_AUDIO_BITRATE: ${{ vars.STREAM_AUDIO_BITRATE }}
+        STREAM_AUDIO_CHANNELS: ${{ vars.STREAM_AUDIO_CHANNELS }}
         GAMEBOX_IMAGE: ${{ vars.GAMEBOX_IMAGE }}
         GAMEBOX_USER: ${{ vars.GAMEBOX_USER }}
         PUID: ${{ vars.PUID }}
@@ -76,7 +79,7 @@ jobs:
            \$root ansible-playbook -i localhost, -c local '$DEPLOY_PATH/ansible/$PLAYBOOK_OPERATION.yml' --extra-vars @\"\$vars_file\""
         import json
         import os
-        fields = ('GAMEBOX_DATA_PATH', 'GAMEBOX_PORT', 'GAMEBOX_IMAGE', 'GAMEBOX_USER', 'PUID', 'PGID', 'TZ', 'GAMEBOX_PASSWORD', 'STREAM_WIDTH', 'STREAM_HEIGHT', 'STREAM_FPS')
+        fields = ('GAMEBOX_DATA_PATH', 'GAMEBOX_PORT', 'GAMEBOX_IMAGE', 'GAMEBOX_USER', 'PUID', 'PGID', 'TZ', 'GAMEBOX_PASSWORD', 'STREAM_WIDTH', 'STREAM_HEIGHT', 'STREAM_FPS', 'STREAM_CRF', 'STREAM_AUDIO_BITRATE', 'STREAM_AUDIO_CHANNELS')
         for key in fields:
             if not os.environ.get(key):
                 raise SystemExit('Missing ' + key)

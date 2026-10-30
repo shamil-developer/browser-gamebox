@@ -19,6 +19,12 @@ services:
       SELKIES_ENABLE_RESIZE: "false"
       SELKIES_USE_CSS_SCALING: "true|locked"
       SELKIES_RAW_POINTER_MOTION: "false|locked"
+      PIXELFLUX_WAYLAND: "false"
+      SELKIES_GAMEPAD_ENABLED: "false"
+      SELKIES_VIDEO_CRF: "${STREAM_CRF}-${STREAM_CRF}"
+      SELKIES_AUDIO_BITRATE: "${STREAM_AUDIO_BITRATE}|locked"
+      SELKIES_AUDIO_CHANNELS: ${STREAM_AUDIO_CHANNELS}
+      SELKIES_USE_PAINT_OVER_QUALITY: "false|locked"
     ports:
       - "127.0.0.1:${GAMEBOX_PORT}:3001"
     volumes:
