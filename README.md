@@ -20,6 +20,9 @@
 | `GAMEBOX_DATA_PATH` | Отдельная папка данных, например `/srv/browser-gamebox` |
 | `GAMEBOX_IMAGE` | Официальный образ с тегом или digest; закреплённый вариант ниже |
 | `GAMEBOX_PORT` | HTTPS-порт на ВМ, например `3001` |
+| `STREAM_WIDTH` | Ширина трансляции в пикселях; для ВМ без GPU начать с `1024` |
+| `STREAM_HEIGHT` | Высота трансляции; например `768` |
+| `STREAM_FPS` | FPS трансляции; для 2 vCPU начать с `30` |
 | `GAMEBOX_USER` | Логин входа в браузере, например `player` |
 | `PUID` / `PGID` | UID / GID владельца файлов: `id -u` и `id -g` обычного пользователя ВМ; положительные числа |
 | `TZ` | Часовой пояс, например `Europe/Moscow` |
@@ -57,6 +60,8 @@ GitHub использует временную машину для SSH. Ansible 
 ```sh
 make tunnel HOST=my-gamebox LOCAL_PORT=3001 REMOTE_PORT=3001
 ```
+
+Разрешение потока фиксируют `STREAM_WIDTH` / `STREAM_HEIGHT`, частоту — `STREAM_FPS`: браузер не повышает их автоматически из-за Retina.
 
 Все три параметра обязательны. Открыть **https://localhost:3001**, подтвердить самоподписанный сертификат, ввести `GAMEBOX_USER` / `GAMEBOX_PASSWORD`. Терминал держать открытым; `Ctrl+C` закрывает туннель.
 

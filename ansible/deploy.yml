@@ -21,16 +21,25 @@
           - gamebox_env.GAMEBOX_PORT | int < 65536
           - gamebox_env.PUID is match('^[1-9][0-9]*$')
           - gamebox_env.PGID is match('^[1-9][0-9]*$')
+          - gamebox_env.STREAM_WIDTH is match('^[0-9]+$')
+          - gamebox_env.STREAM_HEIGHT is match('^[0-9]+$')
+          - gamebox_env.STREAM_FPS is match('^[0-9]+$')
+          - gamebox_env.STREAM_WIDTH | int >= 320
+          - gamebox_env.STREAM_WIDTH | int <= 16384
+          - gamebox_env.STREAM_HEIGHT | int >= 240
+          - gamebox_env.STREAM_HEIGHT | int <= 16384
+          - gamebox_env.STREAM_FPS | int >= 8
+          - gamebox_env.STREAM_FPS | int <= 240
           - gamebox_env.GAMEBOX_IMAGE | length > 0
           - gamebox_env.GAMEBOX_USER | length > 0
           - gamebox_env.GAMEBOX_PASSWORD | length >= 16
           - gamebox_env.TZ | length > 0
           - container_action in ['deploy', 'start', 'stop', 'restart']
-      no_log: false
+      no_log: true
 
     - name: "🔐 Pass Compose settings through the process environment"
       environment: "{{ gamebox_env }}"
-      no_log: false
+      no_log: true
       block:
         - name: "🔎 Validate production Compose"
           ansible.builtin.command:
@@ -89,4 +98,4 @@
       retries: 60
       delay: 2
       when: container_action != 'stop'
-      no_log: false
+      no_log: true
