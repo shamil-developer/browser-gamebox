@@ -26,11 +26,11 @@
           - gamebox_env.GAMEBOX_PASSWORD | length >= 16
           - gamebox_env.TZ | length > 0
           - container_action in ['deploy', 'start', 'stop', 'restart']
-      no_log: true
+      no_log: false
 
     - name: "🔐 Pass Compose settings through the process environment"
       environment: "{{ gamebox_env }}"
-      no_log: true
+      no_log: false
       block:
         - name: "🔎 Validate production Compose"
           ansible.builtin.command:
@@ -89,4 +89,4 @@
       retries: 60
       delay: 2
       when: container_action != 'stop'
-      no_log: true
+      no_log: false
