@@ -56,11 +56,16 @@ jobs:
            \$root tar --no-same-owner --no-same-permissions -xf - -C '$DEPLOY_PATH'"
         echo '::endgroup::'
         echo '::group::▶️ Run Ansible on the server'
-        # Settings travel through SSH stdin; no server-side environment file.
+        # JSON arrives through SSH; a private RAM-backed file is removed on exit.
         python3 - <<'PY' | "${ssh_command[@]}" \
           "set -e; root=''; [ \"\$(id -u)\" = 0 ] || root='sudo -n';
            command -v ansible-playbook >/dev/null || { echo 'Run Install Ansible first.' >&2; exit 1; };
-           \$root ansible-playbook -i localhost, -c local '$DEPLOY_PATH/ansible/$PLAYBOOK_OPERATION.yml' --extra-vars @/dev/stdin"
+           umask 077;
+           vars_file=\$(mktemp /dev/shm/gamebox-vars.XXXXXX);
+           trap 'rm -f \"\$vars_file\"' EXIT;
+           trap 'exit 1' HUP INT TERM;
+           cat > \"\$vars_file\";
+           \$root ansible-playbook -i localhost, -c local '$DEPLOY_PATH/ansible/$PLAYBOOK_OPERATION.yml' --extra-vars @\"\$vars_file\""
         import json
         import os
         fields = ('GAMEBOX_DATA_PATH', 'PUID', 'PGID')
